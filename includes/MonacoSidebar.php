@@ -1,5 +1,6 @@
 <?php
 
+use MediaWiki\HookContainer\HookContainer;
 use MediaWiki\MediaWikiServices;
 
 class MonacoSidebar {
@@ -8,6 +9,10 @@ class MonacoSidebar {
 
 	/** @var string */
 	public $editUrl = '';
+
+	public function __construct( HookContainer $hookContainer ) {
+		$this->hookContainer = $hookContainer;
+	}
 
 	/**
 	 * @param Title $title
@@ -186,7 +191,7 @@ class MonacoSidebar {
 		$nodes = $this->parseSidebar( $lines );
 
 		if ( count( $nodes ) > 0 ) {
-			Hooks::run( 'MonacoSidebarGetMenu', [ &$nodes ] );
+			$this->hookContainer->run( 'MonacoSidebarGetMenu', [ &$nodes ] );
 
 			$menu = '';
 			$mainMenu = [];
@@ -354,7 +359,7 @@ class MonacoSidebar {
 		// Get group membership array.
 		$groups = $user->getEffectiveGroups();
 
-		Hooks::run( 'DynamicSidebarGetGroups', [ &$groups ] );
+		$this->hookContainer->run( 'DynamicSidebarGetGroups', [ &$groups ] );
 
 		// Did we find any groups?
 		if ( count( $groups ) == 0 ) {

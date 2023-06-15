@@ -1,6 +1,7 @@
 <?php
 
 use MediaWiki\MediaWikiServices;
+use MediaWiki\HookContainer\HookContainer;
 
 class MonacoTemplate extends BaseTemplate {
 
@@ -42,7 +43,8 @@ class MonacoTemplate extends BaseTemplate {
 		
 		$this->setupRightSidebar();
 		ob_start();
-		Hooks::run( 'MonacoRightSidebar', [ $this ] );
+		$hookContainer = $this->getHookContainer();
+		$hookContainer->run( 'MonacoRightSidebar', [ $this ] );
 		$this->addToRightSidebar( ob_get_contents() );
 		ob_end_clean();
 
@@ -51,7 +53,7 @@ class MonacoTemplate extends BaseTemplate {
 
 	// this hook allows adding extra HTML just after <body> opening tag
 	// append your content to $html variable instead of echoing
-	Hooks::run( 'GetHTMLAfterBody', [ $this, &$html ] );
+	$hookContainer->run( 'GetHTMLAfterBody', [ $this, &$html ] );
 
 $html .= '<div id="skiplinks"> 
 	<a class="skiplink" href="#article" tabIndex=1>Skip to Content</a> 
@@ -70,7 +72,7 @@ $html .= '<div id="skiplinks">
 		'</div>
 	</div>';
 
-if ( Hooks::run( 'AlternateNavLinks' ) ) {
+if ( $hookContainer->run( 'AlternateNavLinks' ) ) {
 		$html .= '<div id="background_strip" class="reset">
 			<div class="monaco_shrinkwrap">
 
@@ -84,7 +86,7 @@ if ( Hooks::run( 'AlternateNavLinks' ) ) {
 		<!-- PAGE -->
 	<div id="monaco_shrinkwrap_main" class="monaco_shrinkwrap with_left_sidebar' . ( $this->hasRightSidebar() ? ' with_right_sidebar' : null ) . '">
 		<div id="page_wrapper">';
-Hooks::run( 'MonacoBeforePage', [ $this ] );
+$hookContainer->run( 'MonacoBeforePage', [ $this ] );
 $html .= $this->printBeforePage();
 if ( $wgMonacoUseSitenoticeIsland && $this->data['sitenotice'] ) {
 			$html .= '<div class="page">
@@ -93,13 +95,13 @@ if ( $wgMonacoUseSitenoticeIsland && $this->data['sitenotice'] ) {
 }
 		$html .= '<div id="wikia_page" class="page">' .
 			$this->printMasthead();
-			Hooks::run( 'MonacoBeforePageBar', [ $this ] );
+			$hookContainer->run( 'MonacoBeforePageBar', [ $this ] );
 			$html .= $this->printPageBar() . '
 					<!-- ARTICLE -->
 
 				<article id="content" class="mw-body" role="main" aria-labelledby="firstHeading">
 					<a id="top"></a>';
-					Hooks::run( 'MonacoAfterArticle', [ $this ] );
+					$hookContainer->run( 'MonacoAfterArticle', [ $this ] );
 					if ( !$wgMonacoUseSitenoticeIsland && $this->data['sitenotice'] ) { $html .= '<div id="siteNotice">' . $this->get( 'sitenotice' ) . '</div>'; }
 					if ( method_exists( $this, 'getIndicators' ) ) { $html .= $this->getIndicators(); }
 					$html .= $this->printFirstHeading() . '
@@ -129,7 +131,7 @@ if ( $wgMonacoUseSitenoticeIsland && $this->data['sitenotice'] ) {
 global $wgTitle, $wgOut;
 $custom_article_footer = '';
 $namespaceType = '';
-Hooks::run( 'CustomArticleFooter', [ &$this, &$tpl, &$custom_article_footer ] );
+$hookContainer->run( 'CustomArticleFooter', [ &$this, &$tpl, &$custom_article_footer ] );
 if ($custom_article_footer !== '') {
 	$html .= $custom_article_footer;
 } else {
@@ -157,7 +159,7 @@ if ($custom_article_footer !== '') {
 							<ul class="actions" id="articleFooterActions">';
 		if ($namespaceType == 'talk') {
 			$custom_article_footer = '';
-			Hooks::run('AddNewTalkSection', array( &$this, &$tpl, &$custom_article_footer ));
+			$hookContainer->run('AddNewTalkSection', array( &$this, &$tpl, &$custom_article_footer ));
 			if ($custom_article_footer != '')
 				 $html .= $custom_article_footer;
 		} else {
@@ -185,7 +187,8 @@ if ($custom_article_footer !== '') {
 				$userPageTitle = $user->getUserPage();
 				$userPageLink = $userPageTitle->getLocalUrl();
 				$userPageExists = $userPageTitle->exists();
-				$userGender = $user->getOption( 'gender' );
+				$userOptionsManager = MediaWikiServices::getInstance()->getUserOptionsManager();
+				$userGender = $userOptionsManager->getOption( $user, 'gender' );
 				$feUserIcon = $this->blankimg( [ 'id' => 'fe_user_img', 'alt' => '', 'class' => ( $userGender == 'female' ? 'sprite user-female' : 'sprite user' ) ] );
 
 				if ( $userPageExists ) {
@@ -295,9 +298,9 @@ $this->printRightSidebar() . '
 	global $wgSitename;
 	$msgSearchLabel = wfMessage('Tooltip-search')->escaped();
 	$searchLabel = wfMessage('Tooltip-search')->isDisabled() ? (wfMessage('ilsubmit')->escaped().' '.$wgSitename.'...') : $msgSearchLabel;
-
+	$searchAction = SpecialPage::newSearchPage( $user )->getLocalURL();
 			$html .= '<div id="search_box" class="color1" role="search">
-				<form action="' . $this->get('searchaction') . '" id="searchform">
+				<form action="' . $this->get( $searchAction ) . '" id="searchform">
 					<label style="display: none;" for="searchInput">' . htmlspecialchars($searchLabel) . '</label>' .
 					Html::input( 'search', '', 'search', array(
 						'id' => "searchInput",
@@ -313,7 +316,7 @@ $this->printRightSidebar() . '
 					<input type="image" alt="' . htmlspecialchars(wfMessage('search')->escaped()) . '" src="' . $this->get('blankimg') . '" id="search-button" class="sprite search" tabIndex=2 />
 				</form>
 			</div>';
-	$monacoSidebar = new MonacoSidebar();
+	$monacoSidebar = new MonacoSidebar( $hookContainer );
 	if(isset($this->data['content_actions']['edit'])) {
 		$monacoSidebar->editUrl = $this->data['content_actions']['edit']['href'];
 	}
@@ -371,7 +374,7 @@ $this->printRightSidebar() . '
 		}
 		
 		$html .= $this->extendDynamicLinks( $dynamicLinksInternal );
-		Hooks::run( 'MonacoDynamicLinks', array( $this, &$dynamicLinksInternal ) );
+		$hookContainer->run( 'MonacoDynamicLinks', array( $this, &$dynamicLinksInternal ) );
 		$html .= $this->extendDynamicLinksAfterHook( $dynamicLinksInternal );
 		
 		$dynamicLinksUser = array();
@@ -502,7 +505,7 @@ $this->printRightSidebar() . '
 			</div>
 			<!-- /SEARCH/NAVIGATION -->' .
 		$this->printExtraSidebar();
-Hooks::run( 'MonacoSidebarEnd', [ $this ] );
+$hookContainer->run( 'MonacoSidebarEnd', [ $this ] );
 
 		$html .= '</div>
 		<!-- /WIDGETS -->
@@ -513,7 +516,7 @@ $html .= $this->printCustomFooter();
 
 
 $html .= '</div>';
-Hooks::run('SpecialFooter');
+$hookContainer->run('SpecialFooter');
 		$html .= '<div id="positioned_elements" class="reset"></div>';
 echo $html;
 	} // end execute()
@@ -695,7 +698,14 @@ echo $html;
 
 		if ( strval( $page ) !== '' ) {
 			$a['returnto'] = $page;
-			$query = $request->getVal( 'returntoquery', $skin->thisquery );
+			$query = $request->getVal( 'returntoquery' );
+			if ( $query === null && !$request->wasPosted() ) {
+				$thisquery = $request->getValues();
+				unset( $thisquery['title'] );
+				unset( $thisquery['returnto'] );
+				unset( $thisquery['returntoquery'] );
+				$query = $thisquery;
+			}
 			if( $query != '' ) {
 				$a['returntoquery'] = $query;
 			}
@@ -850,11 +860,11 @@ echo $html;
 	
 	function printRightSidebar() {
 		if ( $this->hasRightSidebar() ) {
-		$html .= '<!-- RIGHT SIDEBAR -->
+		$html = '<!-- RIGHT SIDEBAR -->
 		 <div id="right_sidebar" class="sidebar right_sidebar">' .
 $this->lateRightSidebar();
-Hooks::run('MonacoRightSidebar::Late', [ $this ] );
-$html .= $this->mRightSidebar . '
+$hookContainer->run('MonacoRightSidebar::Late', [ $this ] );
+$html = $this->mRightSidebar . '
 		</div>
 		<!-- /RIGHT SIDEBAR -->';
 return $html;
@@ -862,8 +872,9 @@ return $html;
 	}
 	
 	function printMonacoBranding() {
+		$hookContainer = $this->getHookContainer();
 		ob_start();
-		Hooks::run( 'MonacoBranding', array( $this ) );
+		$hookContainer->run( 'MonacoBranding', array( $this ) );
 		$branding = ob_get_contents();
 		ob_end_clean();
 		
@@ -881,7 +892,7 @@ return $html;
 		if( $custom_user_data ) {
 			$html .= $custom_user_data;
 		} else {
-			global $wgUser;
+			$wgUser = $this->getSkin()->getUser();
 			
 			// Output the facebook connect links that were added with PersonalUrls.
 			// @author Sean Colombo
@@ -1133,8 +1144,9 @@ if ( $user->isAnon() ) {
 			$html .= Xml::closeElement( 'li' );
 			$html .= "\n";
 		}
+		$hookContainer = $this->getHookContainer();
 		if ( $hook ) {
-			Hooks::run( $hook );
+			$hookContainer->run( $hook );
 		}
 		$html .= "$indent</ul>\n";
 		
@@ -1143,11 +1155,12 @@ if ( $user->isAnon() ) {
 
 	// Made a separate method so recipes, answers, etc can override. Notably, answers turns it off.
 	function printFirstHeading(){
+		$hookContainer = $this->getHookContainer();
 		if ( !$this->data['skin']->isMastheadTitleVisible() ) {
 			return;
 		}
 		$html = '<h1 id="firstHeading" class="firstHeading" aria-level="1">' . $this->get('title');
-		Hooks::run( 'MonacoPrintFirstHeading' );
+		$hookContainer->run( 'MonacoPrintFirstHeading' );
 		$html .= '</h1>';
 		return $html;
 	}
